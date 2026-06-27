@@ -14,8 +14,20 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Set up MSBuild Environment
+    # Ensure the virtual machine maps the path variables to the MSVC toolsets
+     Pemb-name: Set up MSBuild Environment
       uses: microsoft/setup-msbuild@v2
+
+    - name: Configure Developer Command Prompt Variables
+      uses: ilammy/msvc-dev-cmd@v1
+
+    # Automated check to verify or clone framework dependencies if not cached in submodules
+    - name: Fetch JUCE Dependency Architecture
+      shell: bash
+      run: |
+        if [ ! -d "JUCE" ]; then
+          git clone --depth 1 --branch 7.0.5 https://github.com/juce-framework/JUCE.git JUCE
+        fi
 
     - name: Initialize Project Workspace Compilation Matrix
       run: |
@@ -25,7 +37,7 @@ jobs:
       run: |
         cmake --build build --config Release --parallel 6
 
-    - name: Install Inno Setup Compiler Compiler Tools
+    - name: Install Inno Setup Installer Engine
       run: choco install innosetup
 
     - name: Package System Binaries into Standalone Installer Executable
