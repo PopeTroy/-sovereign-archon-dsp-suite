@@ -14,10 +14,11 @@ jobs:
       with:
         submodules: recursive
 
-    # Fixed formatting line below to ensure strict YAML compliance
+    # 1. Maps MSBuild command paths into the workflow environment
     - name: Set up MSBuild Environment
       uses: microsoft/setup-msbuild@v2
 
+    # 2. Automatically launches the Developer Command Prompt variables behind the scenes
     - name: Configure Developer Command Prompt Variables
       uses: ilammy/msvc-dev-cmd@v1
 
@@ -29,6 +30,7 @@ jobs:
           git clone --depth 1 --branch 7.0.5 https://github.com/juce-framework/JUCE.git JUCE
         fi
 
+    # 3. Now CMake can successfully find your VS 2022 generator dependencies
     - name: Initialize Project Workspace Compilation Matrix
       run: |
         cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
