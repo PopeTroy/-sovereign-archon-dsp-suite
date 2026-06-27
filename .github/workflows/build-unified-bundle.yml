@@ -7,6 +7,10 @@ on:
 jobs:
   compile-and-package:
     runs-on: windows-2022
+    
+    # SUCCESS FIX: Explicitly grant the GITHUB_TOKEN write access to generate releases
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout Code Repository
@@ -20,7 +24,6 @@ jobs:
     - name: Configure Developer Command Prompt Variables
       uses: ilammy/msvc-dev-cmd@v1
 
-    # SUCCESS FIX: Added --recurse-submodules to pull down the VST3 SDK components cleanly
     - name: Fetch JUCE Dependency Architecture
       shell: bash
       run: |
