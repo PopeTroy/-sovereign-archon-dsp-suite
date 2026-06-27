@@ -5,21 +5,39 @@ project(SovereignArchonSuite VERSION 6.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Configure global binary output properties
+# Configure global multi-format plugin settings
 set(JUCE_BUILD_FORMATS_VST3 TRUE CACHE INTERNAL "")
-set(JUCE_BUILD_FORMATS_AU TRUE CACHE INTERNAL "")
 
-# Include the external core audio framework framework dependency
-include(cmake/JUCEHelper.cmake)
+# Include the core audio framework dependency directory
+add_subdirectory(JUCE)
 
-# Link shared custom architecture modules
-add_subdirectory(modules/shared_dsp)
-add_subdirectory(modules/shared_ui)
+# Initialize the Unified Plugin Framework Target
+juce_add_plugin(SovereignArchonSuite
+    VERSION "6.0.0"
+    ICON_BIG ""
+    IS_SYNTH FALSE
+    NEEDS_MIDI_INPUT FALSE
+    NEEDS_MIDI_OUTPUT FALSE
+    IS_MIDI_EFFECT FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS TRUE
+    COPY_PLUGIN_AFTER_BUILD TRUE
+    PLUGIN_MANUFACTURER_CODE "UESP"
+    PLUGIN_CODE "SVRN"
+    FORMATS VST3)
 
-# Register all six standalone plugin components
-add_subdirectory(plugins/SovereignCompressor)
-add_subdirectory(plugins/SovereignSaturation)
-add_subdirectory(plugins/SovereignReverb)
-add_subdirectory(plugins/SovereignDelay)
-add_subdirectory(plugins/SovereignEqualizer)
-add_subdirectory(plugins/SovereignMaximizer)
+# Compile everything out of your primary source folder targets
+target_sources(SovereignArchonSuite PRIVATE
+    source/PluginProcessor.cpp
+    source/PluginProcessor.h
+    source/PluginEditor.cpp
+    source/PluginEditor.h)
+
+target_compile_definitions(SovereignArchonSuite PUBLIC
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0)
+
+target_link_libraries(SovereignArchonSuite PRIVATE
+    juce::juce_audio_utils
+    juce::juce_audio_processors
+    juce::juce_gui_extra
+    juce::juce_gui_basics)
