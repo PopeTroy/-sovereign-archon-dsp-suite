@@ -14,8 +14,8 @@ jobs:
       with:
         submodules: recursive
 
-    # Ensure the virtual machine maps the path variables to the MSVC toolsets
-     Pemb-name: Set up MSBuild Environment
+    # Fixed formatting line below to ensure strict YAML compliance
+    - name: Set up MSBuild Environment
       uses: microsoft/setup-msbuild@v2
 
     - name: Configure Developer Command Prompt Variables
