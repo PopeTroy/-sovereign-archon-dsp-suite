@@ -27,9 +27,13 @@ void SovereignArchonSuiteAudioProcessor::prepareToPlay (double sampleRate, int s
 
 void SovereignArchonSuiteAudioProcessor::releaseResources() {}
 
+// =====================================================================
+// FIXED CORE BUS LAYOUT VERIFIER
+// =====================================================================
 bool SovereignArchonSuiteAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
-    return layouts.getMainOutput() == juce::AudioChannelSet::stereo();
+    // SUCCESS FIX: Resolved standard juce::AudioProcessor::BusesLayout API member call mapping
+    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
 void SovereignArchonSuiteAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
