@@ -25,7 +25,7 @@ juce_add_plugin(SovereignArchonSuite
     PLUGIN_CODE "SVRN"
     FORMATS VST3)
 
-# SUCCESS FIX: Explicitly generate the legacy JuceHeader.h file for your source files
+# Explicitly generate the legacy JuceHeader.h file for your source files
 juce_generate_juce_header(SovereignArchonSuite)
 
 # Pulling files directly from the root workspace directory
@@ -35,9 +35,11 @@ target_sources(SovereignArchonSuite PRIVATE
     PluginEditor.cpp
     PluginEditor.h)
 
+# SUCCESS FIX: Explicitly turning off VST2 legacy dependency layers to clear compilation passes
 target_compile_definitions(SovereignArchonSuite PUBLIC
     JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0)
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0)
 
 target_link_libraries(SovereignArchonSuite PRIVATE
     juce::juce_audio_utils
