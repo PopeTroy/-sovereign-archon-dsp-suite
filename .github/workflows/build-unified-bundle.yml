@@ -20,11 +20,12 @@ jobs:
     - name: Configure Developer Command Prompt Variables
       uses: ilammy/msvc-dev-cmd@v1
 
+    # SUCCESS FIX: Added --recurse-submodules to pull down the VST3 SDK components cleanly
     - name: Fetch JUCE Dependency Architecture
       shell: bash
       run: |
         if [ ! -d "JUCE" ]; then
-          git clone --depth 1 --branch 7.0.5 https://github.com/juce-framework/JUCE.git JUCE
+          git clone --depth 1 --branch 7.0.5 --recurse-submodules https://github.com/juce-framework/JUCE.git JUCE
         fi
 
     - name: Initialize Project Workspace Compilation Matrix
