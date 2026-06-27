@@ -32,7 +32,6 @@ void SovereignArchonSuiteAudioProcessor::releaseResources() {}
 // =====================================================================
 bool SovereignArchonSuiteAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
-    // SUCCESS FIX: Resolved standard juce::AudioProcessor::BusesLayout API member call mapping
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
@@ -151,4 +150,12 @@ float SovereignArchonSuiteAudioProcessor::applyWhite72ALaw(float sample, float A
 juce::AudioProcessorEditor* SovereignArchonSuiteAudioProcessor::createEditor()
 {
     return new SovereignArchonSuiteAudioProcessorEditor (*this);
+}
+
+// =====================================================================
+// GLOBAL JUCE PLUG-IN FACTORY ENTRY POINT
+// =====================================================================
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+{
+    return new SovereignArchonSuiteAudioProcessor();
 }
