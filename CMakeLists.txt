@@ -25,7 +25,10 @@ juce_add_plugin(SovereignArchonSuite
     PLUGIN_CODE "SVRN"
     FORMATS VST3)
 
-# SUCCESS CORRECTION: Pulling files directly from the root workspace directory
+# SUCCESS FIX: Explicitly generate the legacy JuceHeader.h file for your source files
+juce_generate_juce_header(SovereignArchonSuite)
+
+# Pulling files directly from the root workspace directory
 target_sources(SovereignArchonSuite PRIVATE
     PluginProcessor.cpp
     PluginProcessor.h
