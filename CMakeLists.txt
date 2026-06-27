@@ -25,12 +25,12 @@ juce_add_plugin(SovereignArchonSuite
     PLUGIN_CODE "SVRN"
     FORMATS VST3)
 
-# Compile everything out of your primary source folder targets
+# SUCCESS CORRECTION: Pulling files directly from the root workspace directory
 target_sources(SovereignArchonSuite PRIVATE
-    source/PluginProcessor.cpp
-    source/PluginProcessor.h
-    source/PluginEditor.cpp
-    source/PluginEditor.h)
+    PluginProcessor.cpp
+    PluginProcessor.h
+    PluginEditor.cpp
+    PluginEditor.h)
 
 target_compile_definitions(SovereignArchonSuite PUBLIC
     JUCE_WEB_BROWSER=0
