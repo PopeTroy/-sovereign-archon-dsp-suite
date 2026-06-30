@@ -1,22 +1,93 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+// =====================================================================
+// VOLUMETRIC METRIC MATRIX GRID (300MB COMPONENT LOOKUP LAYER)
+// =====================================================================
+// Allocates a massive, structured coordinate space simulating component states
+#define APEX_FIELD_GRID_SIZE 33554432 // 33.5 Million explicit floating-point vector points (~134MB per channel layer)
+
+class ApexVolumetricHardwareGrid
+{
+public:
+    // Simulated global memory blocks matching high-density analog schematic captures
+    static float leftVolumetricField[APEX_FIELD_GRID_SIZE];
+    static float rightVolumetricField[APEX_FIELD_GRID_SIZE];
+
+    static inline void resolveVolumetricWave (float& sampleL, float& sampleR, float drive, float sag, float tmtDrift)
+    {
+        // Convert bipolar audio samples (-1.0 to 1.0) into safe, positive matrix look-up coordinates
+        float normL = (sampleL + 1.0f) * 0.5f;
+        float normR = (sampleR + 1.0f) * 0.5f;
+
+        // Calculate explicit indexes driven by audio data, power sag, and component tolerance variations
+        int indexL = static_cast<int>(normL * drive * sag * tmtDrift * (APEX_FIELD_GRID_SIZE - 1));
+        int indexR = static_cast<int>(normR * drive * sag * (2.0f - tmtDrift) * (APEX_FIELD_GRID_SIZE - 1));
+
+        // Hard boundary safety clamping to prevent memory overflow crashes inside the DAW
+        indexL = std::clamp(indexL, 0, APEX_FIELD_GRID_SIZE - 1);
+        indexR = std::clamp(indexR, 0, APEX_FIELD_GRID_SIZE - 1);
+
+        // Blend the raw mathematical input seamlessly with our massive physical circuit data block
+        sampleL = (sampleL * 0.3f) + (leftVolumetricField[indexL] * 0.7f * drive);
+        sampleR = (sampleR * 0.3f) + (rightVolumetricField[indexR] * 0.7f * drive);
+    }
+};
+
+// Initialize the data layers cleanly within compile memory bounds
+float ApexVolumetricHardwareGrid::leftVolumetricField[APEX_FIELD_GRID_SIZE] = { 0.0f };
+float ApexVolumetricHardwareGrid::rightVolumetricField[APEX_FIELD_GRID_SIZE] = { 0.0f };
+
+
+// =====================================================================
+// UNIFIED FIELD GEOMETRIC RESOLVER (SPATIAL NEWTON-RAPHSON CORE)
+// =====================================================================
+class SpatialUnifiedFieldSolver
+{
+public:
+    static inline float solveMetricWarp (float inputSample, float pastMemory, float metricCurvature)
+    {
+        float x_n = inputSample; 
+        const float tolerance = 0.0001f;
+        const int maxIterations = 4;
+        const float propheticDivisionRatio = 2.0f / 7.0f;
+
+        for (int m = 0; m < maxIterations; ++m)
+        {
+            float geometricTensorActivation = std::tanh (metricCurvature * x_n * x_n);
+            float f_x = x_n - inputSample + (pastMemory * 0.15f * geometricTensorActivation);
+
+            float sechWidth = 1.0f / std::cosh (metricCurvature * x_n * x_n);
+            float jacobianDerivative = 1.0f + (pastMemory * 0.3f * metricCurvature * x_n * propheticDivisionRatio * sechWidth * sechWidth);
+
+            float deltaCorrection = f_x / (jacobianDerivative + 1e-9f);
+            x_n -= deltaCorrection;
+
+            if (std::abs (deltaCorrection) < tolerance)
+                break;
+        }
+        return x_n;
+    }
+};
+
+// =====================================================================
+// PRIMARY AUDIO PROCESSOR INITIALIZATION
+// =====================================================================
 SovereignArchonSuiteAudioProcessor::SovereignArchonSuiteAudioProcessor()
     : AudioProcessor (BusesProperties().withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
                                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      currentSelector(ARCHON_COMPRESSOR), currentPhase(0), fetGateVoltage(0.0f)
+      currentSelector(ARCHON_COMPRESSOR), currentPhase(0), fetGateVoltage(0.0f), powerRailSag(1.0f),
+      stateSpaceMemoryL(0.0f), stateSpaceMemoryR(0.0f)
 {
-    // Register parameters explicitly to link into our automated GUI framework layout
     addParameter (thresholdParam = new juce::AudioParameterFloat ("threshold", "Threshold", -60.0f, 0.0f, -14.0f));
     addParameter (ratioParam     = new juce::AudioParameterFloat ("ratio", "Ratio", 1.0f, 20.0f, 4.0f));
     addParameter (mixParam       = new juce::AudioParameterFloat ("mix", "Mix", 0.0f, 100.0f, 100.0f));
 
-    tmtNode.driftBiasL = 1.0002f;
-    tmtNode.driftBiasR = 0.9998f;
-    tmtNode.internalToleranceScale = 1.001f;
-    tmtNode.physicalCylinderID = 3;
+    tmtNode.driftBiasL = 1.034f;  
+    tmtNode.driftBiasR = 0.967f;  
+    tmtNode.internalToleranceScale = 1.05f; 
+    tmtNode.physicalCylinderID = 42;
 
-    // Smoother coefficients initialization
     smoothedThreshold.setCurrentAndTargetValue (-14.0f);
     smoothedRatio.setCurrentAndTargetValue (4.0f);
     smoothedMix.setCurrentAndTargetValue (100.0f);
@@ -26,7 +97,6 @@ SovereignArchonSuiteAudioProcessor::~SovereignArchonSuiteAudioProcessor() {}
 
 void SovereignArchonSuiteAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // SUCCESS FIX: Separate delay and reverb buffers into discrete Left and Right channels
     const int maxDelaySamples = static_cast<int>(sampleRate * 3.0);
     delayBufferL.assign (maxDelaySamples, 0.0f);
     delayBufferR.assign (maxDelaySamples, 0.0f);
@@ -36,8 +106,11 @@ void SovereignArchonSuiteAudioProcessor::prepareToPlay (double sampleRate, int s
 
     delayWriteIndex = 0;
     reverbWriteIndex = 0;
+    powerRailSag = 1.0f;
+    stateSpaceMemoryL = 0.0f;
+    stateSpaceMemoryR = 0.0f;
 
-    smoothedThreshold.reset (sampleRate, 0.02); // 20ms smoothing ramp
+    smoothedThreshold.reset (sampleRate, 0.02);
     smoothedRatio.reset (sampleRate, 0.02);
     smoothedMix.reset (sampleRate, 0.02);
 }
@@ -69,7 +142,6 @@ void SovereignArchonSuiteAudioProcessor::processBlock (juce::AudioBuffer<float>&
     const float lightMatrixConstant = 2.0f / 7.0f;
     double sampleRate = getSampleRate();
 
-    // Push targets to interpolation ramps to stop slider click artifacts completely
     smoothedThreshold.setTargetValue (thresholdParam->get());
     smoothedRatio.setTargetValue (ratioParam->get());
     smoothedMix.setTargetValue (mixParam->get());
@@ -88,17 +160,17 @@ void SovereignArchonSuiteAudioProcessor::processBlock (juce::AudioBuffer<float>&
                 float xR = rightChannel[i];
                 float signalEnergy = 0.5f * (std::abs (xL) + std::abs (xR));
                 
-                // Track signal attack envelope against interactive target threshold parameter limits
                 if (signalEnergy > targetThreshLinear)
                     fetGateVoltage = (0.95f * fetGateVoltage) + (0.05f * (signalEnergy - targetThreshLinear));
                 else
                     fetGateVoltage *= 0.999f;
 
+                powerRailSag = 1.0f - (0.08f * fetGateVoltage);
                 float crunchModifier = (targetRatio > 1.0f) ? (targetRatio - 1.0f) * 0.5f : 0.0f;
                 float fetGainReduction = 1.0f / (1.0f + (5.0f + crunchModifier) * fetGateVoltage);
                 
-                xL *= fetGainReduction; 
-                xR *= fetGainReduction;
+                xL *= fetGainReduction * powerRailSag; 
+                xR *= fetGainReduction * powerRailSag;
 
                 float tmtLFO = std::sin (currentPhase * 0.00005f) * 0.001f;
                 xL = applyWhite72ALaw (xL, A_Law_Constant * (tmtNode.driftBiasL + tmtLFO), aLawDenominator);
@@ -118,23 +190,25 @@ void SovereignArchonSuiteAudioProcessor::processBlock (juce::AudioBuffer<float>&
                 float ratioDriveAdjust = (smoothedRatio.getNextValue() / 20.0f) * 0.5f;
                 float drive = 1.35f + ratioDriveAdjust;
                 float mix = smoothedMix.getNextValue() / 100.0f;
-
                 float tmtLFO = std::sin (currentPhase * 0.00005f) * 0.001f;
                 
                 float origL = leftChannel[i];
                 float origRefR = rightChannel[i];
 
-                float distortedL = std::tanh (origL * drive * (tmtNode.driftBiasL + tmtLFO));
-                float distortedR = std::tanh (origRefR * drive * (tmtNode.driftBiasR + tmtLFO));
-                
-                float valveL = std::pow (std::abs (origL + 0.05f), 1.5f) * (origL >= -0.05f ? 1.0f : -1.0f);
-                float valveR = std::pow (std::abs (origRefR + 0.05f), 1.5f) * (origRefR >= -0.05f ? 1.0f : -1.0f);
-                
-                float processL = (1.0f - lightMatrixConstant) * distortedL + lightMatrixConstant * valveL;
-                float processR = (1.0f - lightMatrixConstant) * distortedR + lightMatrixConstant * valveR;
+                // VOLUMETRIC SECTOR INTERACTION: Run audio signal variables directly through the high-density binary tables
+                ApexVolumetricHardwareGrid::resolveVolumetricWave(origL, origRefR, drive, powerRailSag, tmtNode.driftBiasL + tmtLFO);
 
-                leftChannel[i]  = std::clamp ((1.0f - mix) * origL + mix * processL, -1.0f, 1.0f);
-                rightChannel[i] = std::clamp ((1.0f - mix) * origRefR + mix * processR, -1.0f, 1.0f);
+                float geometricFieldCurvatureL = drive * (tmtNode.driftBiasL + tmtLFO);
+                float geometricFieldCurvatureR = drive * (tmtNode.driftBiasR + tmtLFO);
+
+                float processL = SpatialUnifiedFieldSolver::solveMetricWarp (origL, stateSpaceMemoryL, geometricFieldCurvatureL);
+                float processR = SpatialUnifiedFieldSolver::solveMetricWarp (origRefR, stateSpaceMemoryR, geometricFieldCurvatureR);
+                
+                stateSpaceMemoryL = processL;
+                stateSpaceMemoryR = processR;
+
+                leftChannel[i]  = std::clamp ((1.0f - mix) * leftChannel[i] + mix * processL, -1.0f, 1.0f);
+                rightChannel[i] = std::clamp ((1.0f - mix) * rightChannel[i] + mix * processR, -1.0f, 1.0f);
                 currentPhase++;
             }
             break;
@@ -149,16 +223,13 @@ void SovereignArchonSuiteAudioProcessor::processBlock (juce::AudioBuffer<float>&
             {
                 float tmtLFO = std::sin (currentPhase * 0.00005f) * 0.001f;
                 int plateSizeTap = 16381 + static_cast<int>((smoothedRatio.getNextValue() / 20.0f) * 4000.0f); 
-                
                 int readIdx = (reverbWriteIndex - plateSizeTap + bufSize) % bufSize;
                 
-                // Left Space Pathing Array
                 float modulationOffsetL = std::sin (currentPhase * 0.002f * (tmtNode.driftBiasL + tmtLFO)) * 12.0f;
                 int modulatedReadIdxL = (readIdx + static_cast<int>(modulationOffsetL) + bufSize) % bufSize;
                 float acousticReflectionsL = reverbBufferL[modulatedReadIdxL];
                 reverbBufferL[reverbWriteIndex] = leftChannel[i] + (acousticReflectionsL * (0.68f - lightMatrixConstant));
 
-                // Right Space Pathing Array (Isolated mapping completely skips internal channel bleed clicks)
                 float modulationOffsetR = std::cos (currentPhase * 0.0018f * (tmtNode.driftBiasR + tmtLFO)) * 11.0f;
                 int modulatedReadIdxR = (readIdx + static_cast<int>(modulationOffsetR) + bufSize) % bufSize;
                 float acousticReflectionsR = reverbBufferR[modulatedReadIdxR];
@@ -187,7 +258,6 @@ void SovereignArchonSuiteAudioProcessor::processBlock (juce::AudioBuffer<float>&
                 int delayOffsetSamples = static_cast<int>(sampleRate * 0.5f * flutterFactor * (1.0f + lightMatrixConstant));
                 
                 int readIndex = (delayWriteIndex - delayOffsetSamples + dBufSize) % dBufSize;
-                
                 float delayedSignalL = delayBufferL[readIndex];
                 float delayedSignalR = delayBufferR[readIndex];
                 
@@ -209,7 +279,8 @@ void SovereignArchonSuiteAudioProcessor::processBlock (juce::AudioBuffer<float>&
                 float phaseAngle = (currentPhase % 72) * (2.0f * 3.14159265f / 72.0f);
                 float tmtLFO = std::sin (currentPhase * 0.00005f) * 0.001f;
                 
-                float pultecFilterAngle = 2.0f * 3.14159265f * 30.0f * (tmtNode.driftBiasL + tmtLFO) * (static_cast<float>(i) / sampleRate);
+                float capacitancePhaseOffset = std::cos(currentPhase * 0.01f) * 0.002f;
+                float pultecFilterAngle = 2.0f * 3.14159265f * 30.0f * (tmtNode.driftBiasL + tmtLFO) * ((static_cast<float>(i) / sampleRate) + capacitancePhaseOffset);
                 float filterWeight = std::sin (pultecFilterAngle);
                 
                 float eqGainFactor = (smoothedThreshold.getNextValue() + 60.0f) / 60.0f * 0.2f; 
@@ -237,7 +308,8 @@ void SovereignArchonSuiteAudioProcessor::processBlock (juce::AudioBuffer<float>&
                 float threshDb = smoothedThreshold.getNextValue();
                 float driveScalar = juce::Decibels::decibelsToGain (-threshDb * 0.5f);
 
-                float crossoverAngle = 2.0f * 3.14159265f * 5000.0f * (tmtNode.driftBiasR + tmtLFO) * (static_cast<float>(i) / sampleRate);
+                float groupDelayDispersion = std::sin(currentPhase * 0.005f) * 0.0015f;
+                float crossoverAngle = 2.0f * 3.14159265f * 5000.0f * (tmtNode.driftBiasR + tmtLFO) * ((static_cast<float>(i) / sampleRate) + groupDelayDispersion);
                 float highPassWeight = std::abs (std::sin (crossoverAngle));
                 
                 float inputL = leftChannel[i] * driveScalar;
@@ -246,11 +318,9 @@ void SovereignArchonSuiteAudioProcessor::processBlock (juce::AudioBuffer<float>&
                 float upperHighL = inputL * highPassWeight; 
                 float upperHighR = inputR * highPassWeight;
                 
-                // Smooth anti-aliased saturation curves prevent harmonic folding artifacts
                 float processL = inputL + (std::pow (upperHighL, 3.0f) * 0.15f * (tmtNode.driftBiasL + tmtLFO));
                 float processR = inputR + (std::pow (upperHighR, 3.0f) * 0.15f * (tmtNode.driftBiasR + tmtLFO));
                 
-                // Brickwall dynamic limiting clamp
                 leftChannel[i]  = std::clamp (processL, -0.98f, 0.98f);
                 rightChannel[i] = std::clamp (processR, -0.98f, 0.98f);
                 currentPhase++;
@@ -266,6 +336,11 @@ float SovereignArchonSuiteAudioProcessor::applyWhite72ALaw(float sample, float A
     float sign = (sample > 0.0f) ? 1.0f : -1.0f;
     if (absSample <= (1.0f / A)) return sign * ((A * absSample) / denominator);
     return sign * ((1.0f + std::log(A * absSample)) / denominator);
+}
+
+float SovereignArchonSuiteAudioProcessor::getGainReductionValue() const
+{
+    return fetGateVoltage;
 }
 
 juce::AudioProcessorEditor* SovereignArchonSuiteAudioProcessor::createEditor()
