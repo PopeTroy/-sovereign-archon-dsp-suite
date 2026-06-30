@@ -52,7 +52,6 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override {}
     void setStateInformation (const void* data, int sizeInBytes) override {}
 
-    // Active Engine State Tracking
     SovereignPluginSelector getActiveMode() const { return currentSelector; }
     void setActiveMode(SovereignPluginSelector newMode) { currentSelector = newMode; }
 
@@ -61,17 +60,26 @@ private:
     unsigned long long currentPhase;
     TMTProfile tmtNode;
 
-    // Processor Parameters
+    // Parameter References
     juce::AudioParameterFloat* thresholdParam;
     juce::AudioParameterFloat* ratioParam;
     juce::AudioParameterFloat* mixParam;
 
-    // Component Memory Matrices
+    // Linear Crossfading Envelopes for Anti-Zipper Operations
+    juce::LinearSmoothedValue<float> smoothedThreshold;
+    juce::LinearSmoothedValue<float> smoothedRatio;
+    juce::LinearSmoothedValue<float> smoothedMix;
+
     float fetGateVoltage;
-    std::vector<float> delayBuffer;
-    int delayBufferIndex;
-    std::vector<float> reverbBuffer;
-    int reverbIndex;
+    
+    // Isolated Left and Right Memory Arrays
+    std::vector<float> delayBufferL;
+    std::vector<float> delayBufferR;
+    int delayWriteIndex;
+    
+    std::vector<float> reverbBufferL;
+    std::vector<float> reverbBufferR;
+    int reverbWriteIndex;
 
     float applyWhite72ALaw(float sample, float A, float denominator);
 
