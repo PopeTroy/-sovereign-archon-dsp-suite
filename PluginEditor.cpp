@@ -4,100 +4,127 @@
 SovereignArchonSuiteAudioProcessorEditor::SovereignArchonSuiteAudioProcessorEditor (SovereignArchonSuiteAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
-    setSize (850, 520);
+    setSize (900, 580);
 
-    auto setupNeonKnob = [this] (juce::Slider& knob, const juce::String& suffix) 
+    auto setupNeonKnob = [this] (juce::Slider& knob, const juce::String& labelName) 
     {
         knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-        knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 80, 20);
-        knob.setTextValueSuffix (suffix);
+        knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 75, 18);
         addAndMakeVisible (knob);
     };
 
-    setupNeonKnob (thresholdKnob, " dB");
-    setupNeonKnob (ratioKnob, " :1");
-    setupNeonKnob (mixKnob, " %");
+    setupNeonKnob (inputGainKnob, "Input");
+    setupNeonKnob (param1Knob, "Control I");
+    setupNeonKnob (param2Knob, "Control II");
+    setupNeonKnob (outputTrimKnob, "Output");
+    setupNeonKnob (tmtChannelKnob, "TMT Desk ID");
+    setupNeonKnob (stereoWidthKnob, "Width");
+
+    // Configure Selector Rail
+    auto setupBtn = [this](juce::TextButton& btn) {
+        btn.setClickingTogglesState(true);
+        btn.setRadioGroupId(1001);
+        addAndMakeVisible(btn);
+    };
+    setupBtn(compressorModeBtn); setupBtn(saturationModeBtn); setupBtn(reverbModeBtn);
+    setupBtn(delayModeBtn); setupBtn(eqModeBtn); setupBtn(maximizerModeBtn);
+    compressorModeBtn.setToggleState(true, juce::dontSendNotification);
 
     startTimerHz (60);
 }
 
-SovereignArchonSuiteAudioProcessorEditor::~SovereignArchonSuiteAudioProcessorEditor()
-{
-    stopTimer();
-}
+SovereignArchonSuiteAudioProcessorEditor::~SovereignArchonSuiteAudioProcessorEditor() { stopTimer(); }
 
 void SovereignArchonSuiteAudioProcessorEditor::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
-    
-    // Glassmorphism Light Grey Backing Substrate
-    g.setColour (juce::Colour::fromString ("#EAEAEA"));
+    g.setColour (juce::Colour::fromString ("#F4F4F6")); // Pure Light Grey Substrate
     g.fillAll();
 
-    g.setColour (juce::Colour::fromString ("#FFFFFF").withAlpha (0.42f));
-    g.fillRoundedRectangle (bounds.reduced (20.0f), 12.0f);
+    // Secondary Glassmorphic Mask Window Frame
+    g.setColour (juce::Colour::fromString ("#FFFFFF").withAlpha (0.55f));
+    g.fillRoundedRectangle (bounds.reduced (15.0f), 10.0f);
+    g.setColour (juce::Colour::fromString ("#2E3440").withAlpha (0.1f));
+    g.drawRoundedRectangle (bounds.reduced (15.0f), 10.0f, 1.0f);
 
-    g.setColour (juce::Colour::fromString ("#FFFFFF").withAlpha (0.65f));
-    g.drawRoundedRectangle (bounds.reduced (20.0f), 12.0f, 1.5f);
+    // Dynamic Engine Explanation Sidebar Module Box
+    auto infoArea = bounds.reduced(30.0f).removeFromBottom(100.0f);
+    g.setColour (juce::Colour::fromString ("#2E3440").withAlpha (0.05f));
+    g.fillRoundedRectangle(infoArea, 6.0f);
 
-    auto width = getWidth();
-    auto height = getHeight();
-    auto midY = height / 2.0f;
-
-    // Glowing Neon Cyan Visualizer Line
-    juce::Path neonVisualizerPath;
-    neonVisualizerPath.startNewSubPath (40.0f, midY + 80.0f);
-    int activePoints = 64;
-    float graphWidth = width - 80.0f;
-
-    for (int i = 0; i < activePoints; ++i)
+    g.setFont (juce::Font ("Courier New", 12.0f, juce::Font::plain));
+    g.setColour (juce::Colour::fromString ("#4C566A"));
+    
+    juce::String explanationText = "ACTIVE MANIFOLD: ";
+    switch (audioProcessor.getActiveMode())
     {
-        float progress = (float)i / (float)activePoints;
-        float xPos = 40.0f + (progress * graphWidth);
-        float waveOscillation = std::sin (progress * 12.0f + (float)juce::Time::getMillisecondCounterHiRes() * 0.006f);
-        float yPos = (midY + 80.0f) + (waveOscillation * 45.0f * std::cos (progress * 3.14159f));
-        neonVisualizerPath.lineTo (xPos, yPos);
+        case ARCHON_COMPRESSOR: explanationText += "FET Feedback Circuit + Logarithmic White 72A Gain Cushioning Math Matrices."; break;
+        case ARCHON_SATURATION: explanationText += "Non-linear Hyperbolic Tangent Wave-shaper blended via 2/7 Light Matrix Constant."; break;
+        case ARCHON_REVERB:     explanationText += "Prime-number Feedback Delay Network replicating mechanical EMT 140 plate acoustics."; break;
+        case ARCHON_DELAY:      explanationText += "Motorized mechanical tape loop emulator driven by random phase flutter LFOs."; break;
+        case ARCHON_EQUALIZER:  explanationText += "Parallel Pultec EQ low-end curve alignment with active 12-cylinder harmonic saturation."; break;
+        case ARCHON_MAXIMIZER:  explanationText += "Zero-compromise hard-clipping brickwall limiter utilizing an odd-harmonic cubing algorithm."; break;
     }
+    g.drawText(explanationText, infoArea.reduced(10.0f), juce::Justification::centredLeft, true);
 
-    g.setColour (juce::Colour::fromString ("#00FFCC").withAlpha (0.12f));
-    g.strokePath (neonVisualizerPath, juce::PathStrokeType (8.0f));
-    g.setColour (juce::Colour::fromString ("#00FFCC").withAlpha (0.35f));
-    g.strokePath (neonVisualizerPath, juce::PathStrokeType (4.0f));
-    g.setColour (juce::Colour::fromString ("#FFFFFF"));
-    g.strokePath (neonVisualizerPath, juce::PathStrokeType (1.5f));
+    // PROMINENT POPE TROY SIGNATURE OVERLAY
+    g.setFont (juce::Font ("Brush Script MT", 36.0f, juce::Font::italic));
+    g.setColour (juce::Colour::fromString ("#FF3344")); // Premium Signature Ruby Red Tint
+    g.drawText ("Pope Troy Signature Edition", 35, 30, 450, 40, juce::Justification::left);
 
-    // Structural Metadata Fine Print Title Overlay
-    g.setFont (juce::Font ("Courier New", 13.0f, juce::Font::bold));
-    g.setColour (juce::Colour::fromString ("#2E3440").withAlpha (0.75f));
-    g.drawText ("SYS_CATALYST // ENGINE: QUANTUM_ARCHON_MANIFOLD", 35, 30, 500, 20, juce::Justification::left);
+    g.setFont (juce::Font ("Arial", 11.0f, juce::Font::bold));
+    g.setColour (juce::Colour::fromString ("#2E3440").withAlpha(0.6f));
+    g.drawText ("SOVEREIGN ARCHON 6-IN-1 ENGINE CORE // UESP PRCE", 35, 70, 500, 20, juce::Justification::left);
 
-    // Branding Footprint
-    int footerY = height - 45;
-    int footerWidth = width - 70;
-
-    // Pope Troy Cursive Red Script Branding
-    g.setFont (juce::Font ("Brush Script MT", 24.0f, juce::Font::italic));
-    g.setColour (juce::Colour::fromString ("#FF3344"));
-    g.drawText ("Pope Troy Signature", footerWidth - 190, footerY - 5, 200, 30, juce::Justification::left);
-
-    // Fine Print UESP PRCE Anchor
-    g.setFont (juce::Font ("Arial", 10.0f, juce::Font::plain));
-    g.setColour (juce::Colour::fromString ("#4C566A").withAlpha (0.65f));
-    g.drawText ("|  UESP PRCE", footerWidth + 25, footerY + 4, 110, 20, juce::Justification::left);
+    // Oscillation Vector Plotter Grid
+    auto waveArea = bounds.reduced(40.0f).removeFromTop(320.0f).removeFromBottom(120.0f);
+    juce::Path waveTrace;
+    waveTrace.startNewSubPath(waveArea.getX(), waveArea.getCentreY());
+    for (float x = waveArea.getX(); x <= waveArea.getRight(); x += 2.0f)
+    {
+        float ratio = (x - waveArea.getX()) / waveArea.getWidth();
+        float frequencyShift = 8.0f + (int)audioProcessor.getActiveMode() * 4.0f;
+        float value = std::sin(ratio * frequencyShift + (float)juce::Time::getMillisecondCounterHiRes() * 0.005f);
+        waveTrace.lineTo(x, waveArea.getCentreY() + (value * 35.0f * std::cos(ratio - 0.5f)));
+    }
+    g.setColour (juce::Colour::fromString ("#00FFCC").withAlpha(0.4f)); // Cyan Glow Accent
+    g.strokePath(waveTrace, juce::PathStrokeType(3.0f));
 }
 
 void SovereignArchonSuiteAudioProcessorEditor::resized()
 {
-    auto area = getLocalBounds().reduced (40);
-    auto knobRowArea = area.removeFromTop (160);
-    int knobWidth = knobRowArea.getWidth() / 3;
+    auto area = getLocalBounds().reduced (35);
+    
+    // Position Engine Configuration Rail Buttons
+    auto topBar = area.removeFromTop(110).removeFromBottom(35);
+    int btnWidth = topBar.getWidth() / 6;
+    compressorModeBtn.setBounds(topBar.removeFromLeft(btnWidth).reduced(2));
+    saturationModeBtn.setBounds(topBar.removeFromLeft(btnWidth).reduced(2));
+    reverbModeBtn.setBounds(topBar.removeFromLeft(btnWidth).reduced(2));
+    delayModeBtn.setBounds(topBar.removeFromLeft(btnWidth).reduced(2));
+    eqModeBtn.setBounds(topBar.removeFromLeft(btnWidth).reduced(2));
+    maximizerModeBtn.setBounds(topBar.reduced(2));
 
-    thresholdKnob.setBounds (knobRowArea.removeFromLeft (knobWidth).reduced (15));
-    ratioKnob.setBounds (knobRowArea.removeFromLeft (knobWidth).reduced (15));
-    mixKnob.setBounds (knobRowArea.reduced (15));
+    // Position Expanded Dial Arrays
+    auto knobZone = area.removeFromTop(200);
+    int kw = knobZone.getWidth() / 6;
+    inputGainKnob.setBounds(knobZone.removeFromLeft(kw).reduced(10));
+    param1Knob.setBounds(knobZone.removeFromLeft(kw).reduced(10));
+    param2Knob.setBounds(knobZone.removeFromLeft(kw).reduced(10));
+    outputTrimKnob.setBounds(knobZone.removeFromLeft(kw).reduced(10));
+    tmtChannelKnob.setBounds(knobZone.removeFromLeft(kw).reduced(10));
+    stereoWidthKnob.setBounds(knobZone.reduced(10));
 }
 
 void SovereignArchonSuiteAudioProcessorEditor::timerCallback()
 {
+    // Check toggle statuses to dynamically route processing loops
+    if (compressorModeBtn.getToggleState()) audioProcessor.setActiveMode(ARCHON_COMPRESSOR);
+    else if (saturationModeBtn.getToggleState()) audioProcessor.setActiveMode(ARCHON_SATURATION);
+    else if (reverbModeBtn.getToggleState()) audioProcessor.setActiveMode(ARCHON_REVERB);
+    else if (delayModeBtn.getToggleState()) audioProcessor.setActiveMode(ARCHON_DELAY);
+    else if (eqModeBtn.getToggleState()) audioProcessor.setActiveMode(ARCHON_EQUALIZER);
+    else if (maximizerModeBtn.getToggleState()) audioProcessor.setActiveMode(ARCHON_MAXIMIZER);
+
     repaint();
 }
