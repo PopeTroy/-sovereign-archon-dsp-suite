@@ -16,9 +16,17 @@ public:
 private:
     void timerCallback() override;
 
-    juce::Slider thresholdKnob;
-    juce::Slider ratioKnob;
-    juce::Slider mixKnob;
+    // Upgraded Dedicated Hardware Control Array
+    juce::Slider inputGainKnob;
+    juce::Slider param1Knob; // Multi-purpose: Threshold, Drive, Plate Size, etc.
+    juce::Slider param2Knob; // Multi-purpose: Ratio, Valve Warmth, Feedback
+    juce::Slider outputTrimKnob;
+    juce::Slider tmtChannelKnob;
+    juce::Slider stereoWidthKnob;
+
+    juce::TextButton compressorModeBtn { "COMP" }, saturationModeBtn { "SAT" }, 
+                     reverbModeBtn { "REVERB" }, delayModeBtn { "DELAY" }, 
+                     eqModeBtn { "EQ" }, maximizerModeBtn { "MAX" };
 
     SovereignArchonSuiteAudioProcessor& audioProcessor;
 
