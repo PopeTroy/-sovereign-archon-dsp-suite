@@ -5,6 +5,9 @@
 #include <cmath>
 #include <algorithm>
 
+// =====================================================================
+// GLOBAL SELECTOR CONSTANTS & STRUCTS
+// =====================================================================
 enum SovereignPluginSelector
 {
     ARCHON_COMPRESSOR,
@@ -23,6 +26,9 @@ struct TMTProfile
     int physicalCylinderID;
 };
 
+// =====================================================================
+// PRIMARY AUDIO PROCESSOR CLASS DECLARATION
+// =====================================================================
 class SovereignArchonSuiteAudioProcessor  : public juce::AudioProcessor
 {
 public:
@@ -52,8 +58,12 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override {}
     void setStateInformation (const void* data, int sizeInBytes) override {}
 
+    // Runtime Selection Interfaces
     SovereignPluginSelector getActiveMode() const { return currentSelector; }
     void setActiveMode(SovereignPluginSelector newMode) { currentSelector = newMode; }
+
+    // SUCCESS FIX: Explicitly declared the UI engine tracking function
+    float getGainReductionValue() const;
 
 private:
     SovereignPluginSelector currentSelector;
@@ -70,9 +80,15 @@ private:
     juce::LinearSmoothedValue<float> smoothedRatio;
     juce::LinearSmoothedValue<float> smoothedMix;
 
+    // Core Analog Component Variables
     float fetGateVoltage;
     
-    // Isolated Left and Right Memory Arrays
+    // SUCCESS FIX: Unified Field State Space & Power Rail Sag Variables Declared
+    float powerRailSag;
+    float stateSpaceMemoryL;
+    float stateSpaceMemoryR;
+    
+    // Isolated Left and Right Memory Tracking Vectors
     std::vector<float> delayBufferL;
     std::vector<float> delayBufferR;
     int delayWriteIndex;
@@ -81,7 +97,7 @@ private:
     std::vector<float> reverbBufferR;
     int reverbWriteIndex;
 
-    float applyWhite72ALaw(float sample, float A, float denominator);
+    float applyWhite72ALaw (float sample, float A, float denominator);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SovereignArchonSuiteAudioProcessor)
 };
